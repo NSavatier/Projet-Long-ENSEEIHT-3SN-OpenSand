@@ -43,6 +43,7 @@
 #include "SlottedAlohaNcc.h"
 #include "RequestSimulator.h"
 #include "SvnoRequest.h"
+#include "InSimulationConfUpdateInterface.h"
 
 
 class SpotDownward: public DvbChannel, public DvbFmt
@@ -150,6 +151,13 @@ class SpotDownward: public DvbChannel, public DvbFmt
 	 * @return true on success, false otherwise
 	 */
 	bool applySvnoCommand(SvnoRequest *svno_request);
+
+    /**
+     * @briel apply ConfUpdate command
+     * @param conf_update_request the ConfUpdate request
+     * @return true on success, false otherwise
+     */
+    bool applyConfUpdateCommand(ConfUpdateRequest *conf_update_request);
 
 	/**
 	 * @brief Build a TTP
@@ -339,6 +347,11 @@ class SpotDownward: public DvbChannel, public DvbFmt
 
 	/// logon response sent
 	OutputEvent *event_logon_resp;
+
+	//Map registering the LogonRequests received to replay them in the event
+	//of a ConfUpdate request that need to reinitialize the DamaController
+    std::map<int, LogonRequest *> confUpdateReplayLogonMap;
+
 };
 
 #endif

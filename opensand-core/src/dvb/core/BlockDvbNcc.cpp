@@ -157,6 +157,7 @@ BlockDvbNcc::Downward::Downward(const string &name, tal_id_t mac_id):
 	DvbSpotList(),
 	pep_interface(),
 	svno_interface(),
+    conf_update_interface(),
 	mac_id(mac_id),
 	fwd_frame_counter(0),
 	fwd_timer(-1),
@@ -290,12 +291,38 @@ bool BlockDvbNcc::Downward::onInit(void)
 	this->addTcpListenEvent("svno_listen",
 	                        this->svno_interface.getSvnoListenSocket(), 200);
 
+    // listen for connections from external ConfUpdate components
+    if(!this->conf_update_interface.initConfUpdateSocket())
+    {
+        LOG(this->log_init, LEVEL_ERROR,
+            "failed to listen for ConfUpdate connections\n");
+        return false;
+    } else {
+        LOG(this->log_init, LEVEL_WARNING,
+            "Now Listening for ConfUpdate connections\n");
+    }
+    this->addTcpListenEvent("conf_update_listen",
+                            this->conf_update_interface.getConfUpdateListenSocket(), 200);
+
 	// Output probes and stats
 	this->probe_frame_interval = Output::registerProbe<float>("Perf.Frames_interval",
 	                                                          "ms", true,
 	                                                          SAMPLE_LAST);
 
 	return result;
+}
+
+
+bool BlockDvbNcc::Downward::shareRequest(ConfUpdateRequest *request)
+{
+    if(!this->shareMessage((void **)&request, sizeof(*request), msg_conf_update))
+    {
+        LOG(this->log_receive, LEVEL_ERROR,
+            "Unable to transmit ConfUpdateRequest to opposite channel\n");
+        delete request;
+        return false;
+    }
+    return true;
 }
 
 bool BlockDvbNcc::Downward::initTimers(void)
@@ -803,6 +830,148 @@ bool BlockDvbNcc::Downward::onEvent(const RtEvent *const event)
 					request = this->svno_interface.getNextSvnoRequest();
 				}
 			}
+			else if(*event == this->conf_update_interface.getConfUpdateClientSocket())
+            {
+                ConfUpdateRequest *request;
+
+                // event received on ConfUpdate client socket
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "event received on ConfUpdate client socket\n");
+
+                // read the message sent by ConfUpdate or delete socket
+                // if connection is dead
+                if(!this->conf_update_interface.readConfUpdateMessage((NetSocketEvent *)event))
+                {
+                    LOG(this->log_receive, LEVEL_WARNING,
+                        "network problem encountered with ConfUpdate, "
+                        "connection was therefore closed\n");
+                    // Free the socket
+                    if(shutdown(this->conf_update_interface.getConfUpdateClientSocket(), SHUT_RDWR) != 0)
+                    {
+                        LOG(this->log_init, LEVEL_ERROR,
+                            "failed to clase socket: "
+                            "%s (%d)\n", strerror(errno), errno);
+                    }
+                    this->removeEvent(this->conf_update_interface.getConfUpdateClientSocket());
+                    return false;
+                }
+                // we have received a set of commands from the
+                // ConfUpdate component, let's apply the configuration updates they asked for
+
+                //apply the commands, one by one
+                request = this->conf_update_interface.getNextConfUpdateRequest();
+                while(request != NULL)
+                {
+                    //Check if the request is for UPWARD (RETURN_BAND) or DOWNWARD (FORWARD_BAND)
+                    //If for DOWNWARD Apply it, else, SHARE IT with UPWARD, So that it can be applied if needed
+                    if(request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH)
+                    {
+                        SpotDownward *spot;
+
+                        // first get the spot concerned by the request
+                        spot_iter = spots.find(request->getSpotId());
+                        if(spot_iter == spots.end())
+                        {
+                            LOG(this->log_receive, LEVEL_ERROR,
+                                "couldn't find spot %d",
+                                request->getSpotId());
+                            return false;
+                        }
+
+                        spot = dynamic_cast<SpotDownward *>((*spot_iter).second);
+                        if(!spot)
+                        {
+                            LOG(this->log_receive, LEVEL_ERROR,
+                                "Error when getting spot\n");
+                            return false;
+                        }
+
+                        //then apply the request
+                        if(!spot->applyConfUpdateCommand(request)) 
+                        {
+                            LOG(this->log_receive, LEVEL_ERROR,
+                                "Cannot apply ConfUpdate interface request\n");
+                            return false;
+                        } else {
+                            LOG(this->log_receive, LEVEL_WARNING,
+                                "confUpdate request applied successfully\n");
+                        }
+                        //finally free it
+                        delete request;
+                    }
+                    else if(request->getType() == CONF_UPDATE_RETURN_BANDWIDTH)
+                    {
+                        //NOTE : IF SAT is regenerative, SpotUpwardRegen uses RETURN_UP_BAND and should
+                        //thus be notified instead of SpotUpward (SpotUpwardRegen does not uses bandwidth)
+                        if(this->satellite_type == REGENERATIVE)
+                        {
+                            SpotDownward *spot;
+
+                            // first get the spot concerned by the request
+                            spot_iter = spots.find(request->getSpotId());
+                            if(spot_iter == spots.end())
+                            {
+                                LOG(this->log_receive, LEVEL_ERROR,
+                                    "couldn't find spot %d",
+                                    request->getSpotId());
+                                return false;
+                            }
+
+                            spot = dynamic_cast<SpotDownward *>((*spot_iter).second);
+                            if(!spot)
+                            {
+                                LOG(this->log_receive, LEVEL_ERROR,
+                                    "Error when getting spot\n");
+                                return false;
+                            }
+
+                            //then apply the request
+                            if(!spot->applyConfUpdateCommand(request))
+                            {
+                                LOG(this->log_receive, LEVEL_ERROR,
+                                    "Cannot apply ConfUpdate interface request\n");
+                                return false;
+                            } else {
+                                LOG(this->log_receive, LEVEL_WARNING,
+                                    "confUpdate request applied successfully\n");
+                            }
+                            //finally free it
+                            delete request;
+                        }
+                        else
+                        {
+                            //If SAT is TRANSPARENT, SpotUpwardRegen must handle the bandwidth update request
+                            //The request concerns the other side (Upward bloc)
+                            //share it with it
+                            if(!this->shareRequest(request))//TODO : penser a delete la frame dans l'opposing block
+                            {
+                                LOG(this->log_receive, LEVEL_ERROR,
+                                    "Error during transmission of ConfUpdate request to Upward block\n");
+                                return false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        //error : unknown ConfUpdate request type
+                        LOG(this->log_receive, LEVEL_ERROR,
+                            "Unknown ConfUpdate request type\n");
+                        return false;
+                    }
+
+
+                    request = this->conf_update_interface.getNextConfUpdateRequest();
+                }
+
+                // Free the socket
+                if(shutdown(this->conf_update_interface.getConfUpdateClientSocket(), SHUT_RDWR) != 0)
+                {
+                    LOG(this->log_init, LEVEL_ERROR,
+                        "failed to clase socket: "
+                        "%s (%d)\n", strerror(errno), errno);
+                }
+                this->removeEvent(this->conf_update_interface.getConfUpdateClientSocket());
+            }
 		}
 		break;
 
@@ -841,6 +1010,23 @@ bool BlockDvbNcc::Downward::onEvent(const RtEvent *const event)
 				                        this->svno_interface.getSvnoClientSocket(),
 				                        200);
 			}
+            else if(*event == this->conf_update_interface.getConfUpdateListenSocket())
+            {
+                this->conf_update_interface.setSocketClient(((TcpListenEvent *)event)->getSocketClient());
+                this->conf_update_interface.setIsConnected(true);
+
+                // event received on ConfUpdate listen socket
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "event received on ConfUpdate listen socket\n");
+
+                // create the client socket to receive messages
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "NCC is now connected to ConfUpdate\n");
+                // add a fd to handle events on the client socket
+                this->addNetSocketEvent("conf_update_client",
+                                        this->conf_update_interface.getConfUpdateClientSocket(),
+                                        200);
+            }
 			break;
 		}
 		default:
@@ -1076,180 +1262,225 @@ bool BlockDvbNcc::Upward::onEvent(const RtEvent *const event)
 	switch(event->getType())
 	{
 		case evt_message:
-		{
-			dvb_frame = (DvbFrame *)((MessageEvent *)event)->getData();
-			spot_id_t dest_spot = dvb_frame->getSpot();
-			SpotUpward *spot;
-			spot = dynamic_cast<SpotUpward *>(this->getSpot(dest_spot));
-			if(!spot)
-			{
-				LOG(this->log_receive, LEVEL_WARNING,
-			        "Error when getting spot\n");
-				delete dvb_frame;
-				return false;
-			}
-			uint8_t msg_type = dvb_frame->getMessageType();
-			LOG(this->log_receive, LEVEL_INFO,
-			    "DVB frame received with type %u\n", msg_type);
-			switch(msg_type)
-			{
-				// burst
-				case MSG_TYPE_BBFRAME:
-				case MSG_TYPE_DVB_BURST:
-				{
-					// Update C/N0
-					spot->handleFrameCni(dvb_frame);
+        {
+            // first handle specific messages
+            if (((MessageEvent *) event)->getMessageType() == msg_conf_update)
+            {
+                //ConfUpdate Request (shared by the Downward block) Handling
+                SpotUpward *spot;
+                ConfUpdateRequest *request;
+                map<spot_id_t, DvbChannel *>::iterator spot_iter;
 
-					NetBurst *burst = NULL;
-					if(!spot->handleFrame(dvb_frame, &burst))
-					{
-						return false;
-					}
+                request = (ConfUpdateRequest * )((MessageEvent *) event)->getData();
 
-					// send the message to the upper layer
-					if(burst && !this->enqueueMessage((void **)&burst))
-					{
-						LOG(this->log_send, LEVEL_ERROR,
-						    "failed to send burst of packets to upper layer\n");
-						delete burst;
-						return false;
-					}
-					LOG(this->log_send, LEVEL_INFO,
-					    "burst sent to the upper layer\n");
-				}
-				break;
+                // first get the spot concerned by the request
+                spot_iter = spots.find(request->getSpotId());
+                if(spot_iter == spots.end())
+                {
+                    LOG(this->log_receive, LEVEL_ERROR,
+                        "couldn't find spot %d",
+                        request->getSpotId());
+                    return false;
+                }
 
-				case MSG_TYPE_SAC:
-				{
-					// Update C/N0
-					Sac *sac = (Sac *) dvb_frame;
-					spot->handleFrameCni(dvb_frame);
-					if(!spot->handleSac(dvb_frame))
-					{
-						return false;
-					}
-					if(!this->shareFrame(dvb_frame))
-					{
-						return false;
-					}
-				}
-				break;
+                spot = dynamic_cast<SpotUpward *>((*spot_iter).second);
+                if(!spot)
+                {
+                    LOG(this->log_receive, LEVEL_ERROR,
+                        "Error when getting spot\n");
+                    return false;
+                }
 
-				case MSG_TYPE_SESSION_LOGON_REQ:
-				{
-					LOG(this->log_receive, LEVEL_INFO,
-					    "Logon Req\n");
-					if(!spot->onRcvLogonReq(dvb_frame))
-					{
-						return false;
-					}
+                //then apply the request
+                if(!spot->applyConfUpdateCommand(request)) 
+                {
+                    LOG(this->log_receive, LEVEL_ERROR,
+                        "Cannot apply ConfUpdate interface request\n");
+                    return false;
+                } else {
+                    LOG(this->log_receive, LEVEL_WARNING,
+                        "confUpdate request applied successfully\n");
+                }
+                //finally free it
+                delete request;
+            }
+            else
+            {
+                //Normal message handling
+                dvb_frame = (DvbFrame * )((MessageEvent *) event)->getData();
+                spot_id_t dest_spot = dvb_frame->getSpot();
+                SpotUpward *spot;
+                spot = dynamic_cast<SpotUpward *>(this->getSpot(dest_spot));
+                if(!spot)
+                {
+                    LOG(this->log_receive, LEVEL_WARNING,
+                        "Error when getting spot\n");
+                    delete dvb_frame;
+                    return false;
+                }
+                uint8_t msg_type = dvb_frame->getMessageType();
+                LOG(this->log_receive, LEVEL_INFO,
+                    "DVB frame received with type %u\n", msg_type);
+                switch(msg_type)
+                {
+                    // burst
+                    case MSG_TYPE_BBFRAME:
+                    case MSG_TYPE_DVB_BURST:
+                    {
+                        // Update C/N0
+                        spot->handleFrameCni(dvb_frame);
 
-					if(!this->shareFrame(dvb_frame))
-					{
-						return false;
-					}
-				}
-				break;
+                        NetBurst *burst = NULL;
+                        if(!spot->handleFrame(dvb_frame, &burst))
+                        {
+                            return false;
+                        }
 
-				case MSG_TYPE_SESSION_LOGOFF:
-				{
-					LOG(this->log_receive, LEVEL_INFO,
-					    "Logoff Req\n");
-					if(!this->shareFrame(dvb_frame))
-					{
-						return false;
-					}
-				}
-				break;
+                        // send the message to the upper layer
+                        if(burst && !this->enqueueMessage((void **) &burst))
+                        {
+                            LOG(this->log_send, LEVEL_ERROR,
+                                "failed to send burst of packets to upper layer\n");
+                            delete burst;
+                            return false;
+                        }
+                        LOG(this->log_send, LEVEL_INFO,
+                            "burst sent to the upper layer\n");
+                    }
+                        break;
 
-				case MSG_TYPE_TTP:
-				case MSG_TYPE_SESSION_LOGON_RESP:
-				{
-					// nothing to do in this case
-					LOG(this->log_receive, LEVEL_DEBUG,
-					    "ignore TTP or logon response "
-					    "(type = %d)\n", dvb_frame->getMessageType());
-					delete dvb_frame;
-				}
-				break;
+                    case MSG_TYPE_SAC:
+                    {
+                        // Update C/N0
+                        Sac *sac = (Sac *) dvb_frame;
+                        spot->handleFrameCni(dvb_frame);
+                        if(!spot->handleSac(dvb_frame))
+                        {
+                            return false;
+                        }
+                        if(!this->shareFrame(dvb_frame))
+                        {
+                            return false;
+                        }
+                    }
+                        break;
 
-				case MSG_TYPE_SOF:
-				{
-					// use SoF for SAloha scheduling
-					spot->updateStats();
-					list<DvbFrame *> *ack_frames = NULL;
-					NetBurst *sa_burst = NULL;
+                    case MSG_TYPE_SESSION_LOGON_REQ:
+                    {
+                        LOG(this->log_receive, LEVEL_INFO,
+                            "Logon Req\n");
+                        if(!spot->onRcvLogonReq(dvb_frame))
+                        {
+                            return false;
+                        }
 
-					if(!spot->scheduleSaloha(dvb_frame, ack_frames, &sa_burst))
-					{
-						return false;
-					}
-					delete dvb_frame;
-					
-					if(!ack_frames && !sa_burst)
-					{
-						// No slotted Aloha
-						break;
-					}
-					if(sa_burst && !this->enqueueMessage((void **)&sa_burst))
-					{
-						LOG(this->log_saloha, LEVEL_ERROR,
-						    "Failed to send encapsulation packets to upper"
-						    " layer\n");
-						if(ack_frames)
-						{
-							delete ack_frames;
-						}
-						return false;
-					}
-					if(ack_frames->size() &&
-					   !this->shareMessage((void **)&ack_frames,
-					                       sizeof(ack_frames),
-					                       msg_saloha))
-					{
-						LOG(this->log_saloha, LEVEL_ERROR,
-						    "Failed to send Slotted Aloha acks to opposite"
-						    " layer\n");
-						delete ack_frames;
-						return false;
-					}
-					// delete ack_frames if they are emtpy, else shareMessage
-					// would set ack_frames == NULL
-					if(ack_frames)
-					{
-						delete ack_frames;
-					}
-				}
-				break;
+                        if(!this->shareFrame(dvb_frame))
+                        {
+                            return false;
+                        }
+                    }
+                        break;
 
-				// Slotted Aloha
-				case MSG_TYPE_SALOHA_DATA:
-				{
-					if(!spot->handleSlottedAlohaFrame(dvb_frame))
-					{
-						return false;
-					}
-				}
-				break;
+                    case MSG_TYPE_SESSION_LOGOFF:
+                    {
+                        LOG(this->log_receive, LEVEL_INFO,
+                            "Logoff Req\n");
+                        if(!this->shareFrame(dvb_frame))
+                        {
+                            return false;
+                        }
+                    }
+                        break;
 
-				case MSG_TYPE_SALOHA_CTRL:
-				{
-					delete dvb_frame;
-				}
-				break;
+                    case MSG_TYPE_TTP:
+                    case MSG_TYPE_SESSION_LOGON_RESP:
+                    {
+                        // nothing to do in this case
+                        LOG(this->log_receive, LEVEL_DEBUG,
+                            "ignore TTP or logon response "
+                            "(type = %d)\n", dvb_frame->getMessageType());
+                        delete dvb_frame;
+                    }
+                        break;
 
-				default:
-				{
-					LOG(this->log_receive, LEVEL_ERROR,
-					    "unknown type (%d) of DVB frame\n",
-					    dvb_frame->getMessageType());
-					delete dvb_frame;
-					return false;
-				}
-				break;
-			}
-		}
-		break;
+                    case MSG_TYPE_SOF:
+                    {
+                        // use SoF for SAloha scheduling
+                        spot->updateStats();
+                        list<DvbFrame *> *ack_frames = NULL;
+                        NetBurst *sa_burst = NULL;
+
+                        if(!spot->scheduleSaloha(dvb_frame, ack_frames, &sa_burst))
+                        {
+                            return false;
+                        }
+                        delete dvb_frame;
+
+                        if(!ack_frames && !sa_burst)
+                        {
+                            // No slotted Aloha
+                            break;
+                        }
+                        if(sa_burst && !this->enqueueMessage((void **) &sa_burst))
+                        {
+                            LOG(this->log_saloha, LEVEL_ERROR,
+                                "Failed to send encapsulation packets to upper"
+                                " layer\n");
+                            if(ack_frames)
+                            {
+                                delete ack_frames;
+                            }
+                            return false;
+                        }
+                        if(ack_frames->size() &&
+                            !this->shareMessage((void **) &ack_frames,
+                                                sizeof(ack_frames),
+                                                msg_saloha))
+                        {
+                            LOG(this->log_saloha, LEVEL_ERROR,
+                                "Failed to send Slotted Aloha acks to opposite"
+                                " layer\n");
+                            delete ack_frames;
+                            return false;
+                        }
+                        // delete ack_frames if they are emtpy, else shareMessage
+                        // would set ack_frames == NULL
+                        if(ack_frames)
+                        {
+                            delete ack_frames;
+                        }
+                    }
+                        break;
+
+                        // Slotted Aloha
+                    case MSG_TYPE_SALOHA_DATA:
+                    {
+                        if(!spot->handleSlottedAlohaFrame(dvb_frame))
+                        {
+                            return false;
+                        }
+                    }
+                        break;
+
+                    case MSG_TYPE_SALOHA_CTRL:
+                    {
+                        delete dvb_frame;
+                    }
+                        break;
+
+                    default:
+                    {
+                        LOG(this->log_receive, LEVEL_ERROR,
+                            "unknown type (%d) of DVB frame\n",
+                            dvb_frame->getMessageType());
+                        delete dvb_frame;
+                        return false;
+                    }
+                    break;
+                }
+            }
+        }
+        break;
 
 		default:
 			LOG(this->log_receive, LEVEL_ERROR,

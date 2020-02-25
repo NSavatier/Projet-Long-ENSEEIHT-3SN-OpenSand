@@ -52,6 +52,14 @@ class SpotUpwardRegen: public SpotUpward
 		bool onInit();
 
 
+        /**
+         * @brief ConfUpdate bandwidth update & reallocation
+         * Does nothing in the regenerative case
+         *
+         * @return true
+         */
+        bool confUpdateBandwidth();
+
 		/**
 		 *  @brief Handle a logon request transmitted by the lower layer
 		 *

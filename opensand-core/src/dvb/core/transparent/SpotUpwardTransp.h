@@ -54,6 +54,13 @@ class SpotUpwardTransp: public SpotUpward
 		virtual ~SpotUpwardTransp();
 		bool onInit();
 
+        /**
+         * @brief ConfUpdate bandwidth update & reallocation
+         * Overrides confUpdateBandwidth() defined in SpotUpward
+         * @return true on success, false otherwise
+         */
+        bool confUpdateBandwidth();
+
 
 		/**
 		 * @brief Handle a DVB frame

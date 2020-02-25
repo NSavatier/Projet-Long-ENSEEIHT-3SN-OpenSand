@@ -85,6 +85,13 @@ bool SpotUpwardRegen::onInit(void)
 
 }
 
+bool SpotUpwardRegen::confUpdateBandwidth(){
+    //nothing to do in the regenerative case
+    LOG(this->log_init_channel, LEVEL_WARNING,
+        "Nothing done in the regenerative case for confUpdateBandwidth()\n");
+    return true;
+}
+
 bool SpotUpwardRegen::initModcodSimu(void)
 {
 	if(!this->initModcodDefFile(this->modcod_def_rcs_type.c_str(),

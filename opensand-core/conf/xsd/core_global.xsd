@@ -333,6 +333,7 @@
     <xsd:complexType>
         <xsd:sequence>
             <xsd:element ref="common" />
+            <xsd:element ref="conf_update_interface" />
             <xsd:element ref="forward_down_band" />
             <xsd:element ref="return_up_band" />
             <xsd:element ref="slotted_aloha" />
@@ -443,6 +444,36 @@
                         period used to determine when we should send a request
                         and to compute RBDC timeout
                         <unit>ms</unit>
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:complexType>
+</xsd:element>
+
+<xsd:simpleType name="port">
+    <xsd:restriction base="xsd:positiveInteger">
+        <xsd:minInclusive value="1500" />
+        <xsd:maxInclusive value="65535" />
+    </xsd:restriction>
+</xsd:simpleType>
+
+<!-- conf_update_interface section description -->
+<xsd:element name="conf_update_interface">
+    <xsd:annotation>
+        <xsd:documentation xml:lang="en">
+            <![CDATA[
+    <b>\tThe parameters for the ConfUpdate interface</b>
+    ]]>
+            <hide>true</hide>
+        </xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexType>
+        <xsd:sequence>
+            <xsd:element name="conf_update_port" type="port">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Communication port for ConfUpdate messages
                     </xsd:documentation>
                 </xsd:annotation>
             </xsd:element>

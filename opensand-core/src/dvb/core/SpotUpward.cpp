@@ -38,6 +38,11 @@
 
 #include "DamaCtrlRcsLegacy.h"
 
+
+#include "Plugin.h"
+#include <opensand_conf/Configuration.h>
+#include "ConfUpdateXMLParser.h"
+
 #include "DvbRcsStd.h"
 #include "DvbS2Std.h"
 #include "Sof.h"
@@ -128,6 +133,12 @@ error_mode:
 
 }
 
+bool SpotUpward::confUpdateBandwidth(){
+    //nothing to do in the general case
+    LOG(this->log_init_channel, LEVEL_WARNING,
+        "Nothing done in the general case for confUpdateBandwidth()\n");
+    return true;
+}
 
 
 bool SpotUpward::onRcvLogonReq(DvbFrame *dvb_frame)
@@ -206,4 +217,84 @@ bool SpotUpward::handleSac(const DvbFrame *dvb_frame)
 	return true;
 }
 
+
+bool SpotUpward::applyConfUpdateCommand(ConfUpdateRequest *conf_update_request){
+
+    bool confUpdated;
+
+    //apply command only in the case of a transparent SAT
+    //and if the request asks for RETURN bandwidth modification
+    if(this->satellite_type == TRANSPARENT){
+        if(conf_update_request->getType() == CONF_UPDATE_RETURN_BANDWIDTH)
+        {
+            //update the BANDWIDTH entry in the configuration file for the specified Spot
+            ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
+
+            //parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+            confUpdated = parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+            if(!confUpdated){
+                LOG(this->log_receive_channel, LEVEL_ERROR,
+                    "Error during XML configuration file update in SpotUpward");
+                return false;
+            }
+        } else if(conf_update_request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH) {
+            LOG(this->log_receive_channel, LEVEL_WARNING,
+                "CONF_UPDATE_FORWARD_BANDWIDTH request received in SpotUpward, ignored");
+            return true;
+        } else {
+            LOG(this->log_receive_channel, LEVEL_ERROR,
+                "unknown ConfUpdate request type in SpotUpward");
+            return false;
+        }
+    } else {
+        LOG(this->log_receive_channel, LEVEL_WARNING,
+            "SAT is Regenerative, nothing to do for ConfUpdate in SpotUpward");
+        return true;
+    }
+
+    //Reload the configuration file
+    {
+        vector <string> conf_files;
+        string topology_file = CONF_PATH + string(CONF_TOPOLOGY);
+        string global_file = CONF_PATH + string(CONF_GLOBAL_FILE);
+        string default_file = CONF_PATH + string(CONF_DEFAULT_FILE);
+        string plugin_conf_path = CONF_PATH + string("plugins/");
+
+        conf_files.push_back(topology_file.c_str());
+        conf_files.push_back(global_file.c_str());
+        conf_files.push_back(default_file.c_str());
+
+        //Unload configuration files content //TODO Dangerous if not reloaded properly !!!
+        Conf::unloadConfig();
+        // Load configuration files content
+        if (!Conf::loadConfig(conf_files)) {
+            LOG(this->log_receive_channel, LEVEL_CRITICAL,
+                "SpotUpward : cannot reload configuration files\n");
+            return false;
+        } else {
+            LOG(this->log_receive_channel, LEVEL_WARNING,
+                "SpotUpward : configuration file reloaded with success\n");
+        }
+        OpenSandConf::loadConfig();
+
+        // load the plugins
+        if(!Plugin::loadPlugins(true, plugin_conf_path))
+        {
+            LOG(this->log_init_channel, LEVEL_CRITICAL,
+                "SpotUpward : cannot load the plugins\n");
+            return false;
+        }
+    }
+
+    //Finally, recompute the bandwidth allocation
+    if(!this->confUpdateBandwidth())//should normally call SpotUpwardTransp::initMode() which does the bandwidth modif
+    {
+        LOG(this->log_receive_channel, LEVEL_ERROR,
+            "failed to reinit bandwidth allocation\n");
+        return false;
+    }
+
+
+    return true;
+}
 

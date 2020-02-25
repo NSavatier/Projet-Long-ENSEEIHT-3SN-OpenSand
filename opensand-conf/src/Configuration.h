@@ -116,6 +116,14 @@ class Conf
 	 */
 	static bool loadConfig(const vector<string> conf_files);
 
+
+	/**
+	 * Unloads the whole configuration
+	 * WARNING : The configuration should be Reloaded after calling this function,
+	 * else the system will not work properly, since it will lack its configuration parameters
+	 */
+	static void unloadConfig();
+
 	/**
 	 * @brief Get the component among sat, gw, st or ws
 	 *

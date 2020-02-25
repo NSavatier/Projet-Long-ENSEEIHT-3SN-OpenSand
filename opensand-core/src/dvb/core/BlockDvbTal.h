@@ -51,6 +51,8 @@
 #include "OpenSandFrames.h"
 #include "OpenSandCore.h"
 
+#include "InSimulationConfUpdateInterface.h"
+
 #include <opensand_conf/conf.h>
 #include <opensand_output/Output.h>
 #include <opensand_rt/Rt.h>
@@ -357,6 +359,13 @@ class BlockDvbTal: public BlockDvb
 		 */
 		void deletePackets(void);
 
+        /**
+         * @briel apply ConfUpdate command
+         * @param conf_update_request the ConfUpdate request
+         * @return true on success, false otherwise
+         */
+        bool applyConfUpdateCommand(ConfUpdateRequest *conf_update_request);
+
 		/// reception standard (DVB-RCS or DVB-S2)
 		PhysicStd *reception_std; 
 
@@ -375,6 +384,9 @@ class BlockDvbTal: public BlockDvb
 		spot_id_t spot_id;
 		// is the terminal scpc
 		bool is_scpc;
+
+        /// The interface between ST and ConfUpdate
+        InSimulationConfUpdateInterface conf_update_interface;
 
 		/// fixed bandwidth (CRA) in kbits/s
 		rate_kbps_t cra_kbps;

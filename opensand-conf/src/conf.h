@@ -157,6 +157,13 @@
 #define NCC_SECTION_SVNO     "svno_interface"
 #define SVNO_NCC_PORT        "svno_to_ncc_port"
 
+////////////////////////////////////////
+// IN-SIMULATION CONF UPDATE section  //
+////////////////////////////////////////
+
+#define SECTION_CONF_UPDATE     "conf_update_interface"
+#define CONF_UPDATE_PORT        "conf_update_port"
+
 //////////////////
 // DAMA CONTROL //
 //////////////////

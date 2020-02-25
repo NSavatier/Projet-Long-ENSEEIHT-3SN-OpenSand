@@ -5,14 +5,18 @@ libopensand_dvb_ncc_interface_la_cpp = \
 	PepRequest.cpp \
 	NccPepInterface.cpp \
 	SvnoRequest.cpp \
-	NccSvnoInterface.cpp
+	NccSvnoInterface.cpp \
+	InSimulationConfUpdateInterface.cpp \
+	ConfUpdateRequest.cpp
 
 libopensand_dvb_ncc_interface_la_h = \
 	NccInterface.h \
 	PepRequest.h \
 	NccPepInterface.h \
 	SvnoRequest.h \
-	NccSvnoInterface.h
+	NccSvnoInterface.h \
+	InSimulationConfUpdateInterface.h \
+    ConfUpdateRequest.h
 
 libopensand_dvb_ncc_interface_la_SOURCES = \
 	$(libopensand_dvb_ncc_interface_la_cpp) \

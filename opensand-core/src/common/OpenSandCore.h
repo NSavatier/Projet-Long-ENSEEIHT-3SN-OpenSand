@@ -205,6 +205,7 @@ enum
 	msg_link_up,   ///< link up message
 	msg_sig,       ///< message containing signalisation
 	msg_saloha,    ///< message containing Slotted Aloha content
+    msg_conf_update ///<message containing a ConfUpdate Request
 };
 
 

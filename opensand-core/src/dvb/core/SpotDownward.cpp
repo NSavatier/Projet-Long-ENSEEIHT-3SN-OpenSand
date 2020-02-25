@@ -39,6 +39,10 @@
 #include "FileSimulator.h"
 #include "RandomSimulator.h"
 
+#include "Plugin.h"
+#include <opensand_conf/Configuration.h>
+#include "ConfUpdateXMLParser.h"
+
 #include <errno.h>
 
 
@@ -88,7 +92,8 @@ SpotDownward::SpotDownward(spot_id_t spot_id,
 	probe_frame_interval(NULL),
 	probe_sent_modcod(NULL),
 	log_request_simulation(NULL),
-	event_logon_resp(NULL)
+	event_logon_resp(NULL),
+    confUpdateReplayLogonMap()
 {
 	this->fwd_down_frame_duration_ms = fwd_down_frame_duration;
 	this->ret_up_frame_duration_ms = ret_up_frame_duration;
@@ -666,6 +671,20 @@ bool SpotDownward::handleLogonReq(const LogonRequest *logon_req)
 	    "SF#%u: logon response sent to lower layer\n",
 	    this->super_frame_counter);
 
+	//finally, register the logon in confUpdateReplayLogonMap map
+	//this is done to be able to replay it if a ConfUpdate request need to reinitialize the damaController later
+	//to do so, create a clone of the logon and register it (only if not already known)
+	if(this->confUpdateReplayLogonMap.find(logon_req->getMac()) == this->confUpdateReplayLogonMap.end())
+    {
+        LogonRequest *logon_req_clone = new LogonRequest(logon_req->getMac(),
+                                                         logon_req->getRtBandwidth(),
+                                                         logon_req->getMaxRbdc(),
+                                                         logon_req->getMaxVbdc(),
+                                                         logon_req->getIsScpc());
+
+        this->confUpdateReplayLogonMap.insert(std::pair<int, LogonRequest *>(logon_req_clone->getMac(), logon_req_clone));
+    }//if request already registered, do nothing (case of a logon beeing replayed)
+
 	return true;
 }
 
@@ -700,6 +719,10 @@ bool SpotDownward::handleLogoffReq(const DvbFrame *dvb_frame)
 	LOG(this->log_receive_channel, LEVEL_DEBUG,
 	    "SF#%u: logoff request from %d\n",
 	    this->super_frame_counter, logoff->getMac());
+
+
+    //finally, unregister the logon in confUpdateReplayLogonMap map
+    this->confUpdateReplayLogonMap.erase(logoff->getMac());
 
 	delete dvb_frame;
 	return true;
@@ -1050,4 +1073,130 @@ bool SpotDownward::applySvnoCommand(SvnoRequest *svno_request)
 	}
 
 	return true;
+}
+
+
+//TODO : this function could be splitted and be redefined by SpotDownardRegen and SpotDownwardTransp
+bool SpotDownward::applyConfUpdateCommand(ConfUpdateRequest *conf_update_request){
+
+    bool confUpdated;
+
+    //for Downward, apply command in both satellite_type
+    //but check that the request asks for FORWARD bandwidth modification
+    if(conf_update_request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH){
+        //update the BANDWIDTH entry in the configuration file for the specified Spot
+        ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
+        confUpdated = parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(),
+                                                                 conf_update_request->getGatewayId(),
+                                                                 conf_update_request->getBandwidthNewValue());
+        delete parser;
+        if(!confUpdated){
+            LOG(this->log_receive_channel, LEVEL_ERROR,
+                "Error during XML configuration file update in SpotDownward");
+            return false;
+        }
+    } else if(conf_update_request->getType() == CONF_UPDATE_RETURN_BANDWIDTH){
+        //If SAT is Transparent, SpotDownwardTransp does not uses Return bandwidth
+        // (only forward bandwidth), so the request can be ignored
+        if(this->satellite_type == TRANSPARENT)
+        {
+            LOG(this->log_receive_channel, LEVEL_WARNING,
+                "CONF_UPDATE_RETURN_BANDWIDTH request received in SpotDownward, while SAT is Transparent. Request ignored");
+            return true;
+        }
+        else
+        {
+            //else, handle the request, because SpotDownwardRegen uses RETURN_UP_BAND
+            ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
+            confUpdated = parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(),
+                                                                    conf_update_request->getGatewayId(),
+                                                                    conf_update_request->getBandwidthNewValue());
+            delete parser;
+            if(!confUpdated){
+                LOG(this->log_receive_channel, LEVEL_ERROR,
+                    "Error during XML configuration file update in SpotDownward");
+                return false;
+            }
+        }
+    } else {
+        LOG(this->log_receive_channel, LEVEL_ERROR,
+            "unknown ConfUpdate request type in BlockDvbTal");
+        return false;
+    }
+
+    //Reload the configuration file
+    {
+        vector <string> conf_files;
+        string topology_file = CONF_PATH + string(CONF_TOPOLOGY);
+        string global_file = CONF_PATH + string(CONF_GLOBAL_FILE);
+        string default_file = CONF_PATH + string(CONF_DEFAULT_FILE);
+        string plugin_conf_path = CONF_PATH + string("plugins/");
+
+        conf_files.push_back(topology_file.c_str());
+        conf_files.push_back(global_file.c_str());
+        conf_files.push_back(default_file.c_str());
+
+        //Unload configuration files content //TODO Dangerous if not reloaded properly !!!
+        Conf::unloadConfig();
+        // Load configuration files content
+        if (!Conf::loadConfig(conf_files)) {
+            LOG(this->log_init_channel, LEVEL_CRITICAL,
+                "SpotDownward : cannot reload configuration files\n");
+            return false;
+        } else {
+            LOG(this->log_init_channel, LEVEL_WARNING,
+                "SpotDownward : configuration file reloaded with success\n");
+        }
+        OpenSandConf::loadConfig();
+
+        // load the plugins
+        if(!Plugin::loadPlugins(true, plugin_conf_path))
+        {
+            LOG(this->log_init_channel, LEVEL_CRITICAL,
+                "SpotDownward : cannot load the plugins\n");
+            return false;
+        }
+    }
+
+    //Empty categories to avoid duplicates
+    this->categories.clear();
+
+    //Finally, recompute the bandwidth allocation
+    //here we only call function that use initBand
+    if(!this->initMode())
+    {
+        LOG(this->log_init_channel, LEVEL_ERROR,
+            "failed to complete the mode part of the "
+            "initialisation\n");
+        return false;
+    }
+    //initDama calls initBand only in regenerative mode
+    if(this->satellite_type == REGENERATIVE)
+    {
+        // get and launch the dama algorithm
+        if(!this->initDama())
+        {
+            LOG(this->log_init_channel, LEVEL_ERROR,
+                "failed to complete the DAMA part of the "
+                "initialisation\n");
+            return false;
+        }
+        //Reinitializing the DamaController causes the GW to lose track of currently logged-on ST
+        //To avoid that, we simulate the re-registration of STs
+        std::map<int, LogonRequest *>::iterator it = confUpdateReplayLogonMap.begin();
+        while (it != confUpdateReplayLogonMap.end())
+        {
+            LogonRequest *value = it->second;
+
+            //replay logon request (note : the LogonRequest will NOT be registered again,
+            //see handleLogonReq() for more details
+            this->handleLogonReq(value);
+
+            it++;
+        }
+    }
+
+
+
+    return true;
 }

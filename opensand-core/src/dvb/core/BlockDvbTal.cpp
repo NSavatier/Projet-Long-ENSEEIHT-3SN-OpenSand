@@ -58,6 +58,11 @@
 
 #include <opensand_rt/Rt.h>
 
+
+#include "Plugin.h"
+#include <opensand_conf/Configuration.h>
+#include "ConfUpdateXMLParser.h"
+
 #include <sstream>
 #include <assert.h>
 #include <unistd.h>
@@ -157,6 +162,7 @@ BlockDvbTal::Downward::Downward(const string &name, tal_id_t mac_id):
 	gw_id(),
 	spot_id(),
 	is_scpc(false),
+    conf_update_interface(),
 	cra_kbps(0),
 	max_rbdc_kbps(0),
 	max_vbdc_kb(0),
@@ -355,6 +361,19 @@ bool BlockDvbTal::Downward::onInit(void)
 		    "failed to complete the initialization of timers\n");
 		return false;
 	}
+
+    // listen for connections from external ConfUpdate components
+    if(!this->conf_update_interface.initConfUpdateSocket())
+    {
+        LOG(this->log_init, LEVEL_ERROR,
+            "failed to listen for ConfUpdate connections\n");
+        return false;
+    } else {
+        LOG(this->log_init, LEVEL_WARNING,
+                "Now Listening for ConfUpdate connections\n");
+    }
+    this->addTcpListenEvent("conf_update_listen",
+                            this->conf_update_interface.getConfUpdateListenSocket(), 200);
 
 	// now everyhing is initialized so we can do some processing
 
@@ -1636,6 +1655,95 @@ bool BlockDvbTal::Downward::onEvent(const RtEvent *const event)
 			}
 			break;
 		}
+        case evt_net_socket:
+        {
+            if(*event == this->conf_update_interface.getConfUpdateClientSocket())
+            {
+                ConfUpdateRequest *request;
+
+                // event received on ConfUpdate client socket
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "event received on ConfUpdate client socket\n");
+
+                // read the message sent by ConfUpdate or delete socket
+                // if connection is dead
+                if(!this->conf_update_interface.readConfUpdateMessage((NetSocketEvent *)event))
+                {
+                    LOG(this->log_receive, LEVEL_WARNING,
+                        "network problem encountered with ConfUpdate, "
+                        "connection was therefore closed\n");
+                    // Free the socket
+                    if(shutdown(this->conf_update_interface.getConfUpdateClientSocket(), SHUT_RDWR) != 0)
+                    {
+                        LOG(this->log_init, LEVEL_ERROR,
+                            "failed to clase socket: "
+                            "%s (%d)\n", strerror(errno), errno);
+                    }
+                    this->removeEvent(this->conf_update_interface.getConfUpdateClientSocket());
+                    return false;
+                }
+                // we have received a set of commands from the
+                // ConfUpdate component, let's apply the configuration updates they asked for
+
+                //apply the commands, one by one
+                request = this->conf_update_interface.getNextConfUpdateRequest();
+                while(request != NULL)
+                {
+                    // first get the spot concerned by the request
+                    //if the request's SPOT matches this ST's Spot, apply the request, else drop it
+                    if(request->getSpotId() == this->spot_id){
+                        if(!this->applyConfUpdateCommand(request)) // TODO : note the call here (ajouter au futur diagramme expliquant mes modifs)
+                        {
+                            LOG(this->log_receive, LEVEL_ERROR,
+                                "Cannot apply ConfUpdate interface request\n");
+                            return false;
+                        } else {
+                            LOG(this->log_receive, LEVEL_WARNING,
+                                "confUpdate request applied successfully\n");
+                        }
+                    } else {
+                        LOG(this->log_receive, LEVEL_ERROR,
+                            "Received a ConfUpdate request with wrong spot id : %d, while this ST spot ID is %d",
+                            request->getSpotId(), this->spot_id);
+                        return false;
+                    }
+
+                    delete request;
+                    request = this->conf_update_interface.getNextConfUpdateRequest();
+                }
+
+                // Free the socket
+                if(shutdown(this->conf_update_interface.getConfUpdateClientSocket(), SHUT_RDWR) != 0)
+                {
+                    LOG(this->log_init, LEVEL_ERROR,
+                        "failed to close socket: "
+                        "%s (%d)\n", strerror(errno), errno);
+                }
+                this->removeEvent(this->conf_update_interface.getConfUpdateClientSocket());
+            }
+        }
+        break;
+        case evt_tcp_listen:
+        {
+            if(*event == this->conf_update_interface.getConfUpdateListenSocket())
+            {
+                this->conf_update_interface.setSocketClient(((TcpListenEvent *)event)->getSocketClient());
+                this->conf_update_interface.setIsConnected(true);
+
+                // event received on ConfUpdate listen socket
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "event received on ConfUpdate listen socket\n");
+
+                // create the client socket to receive messages
+                LOG(this->log_receive, LEVEL_NOTICE,
+                    "ST is now connected to ConfUpdate\n");
+                // add a fd to handle events on the client socket
+                this->addNetSocketEvent("conf_update_client",
+                                        this->conf_update_interface.getConfUpdateClientSocket(),
+                                        200);
+            }
+            break;
+        }
 		default:
 			LOG(this->log_receive, LEVEL_ERROR,
 			    "SF#%u: unknown event received %s",
@@ -2285,6 +2393,104 @@ void BlockDvbTal::Downward::deletePackets()
 	{
 		(*it).second->flush();
 	}
+}
+
+
+bool BlockDvbTal::Downward::applyConfUpdateCommand(ConfUpdateRequest *conf_update_request){
+
+    bool confUpdated;
+
+    //apply command for all types of SAT
+    if(conf_update_request->getType() == CONF_UPDATE_RETURN_BANDWIDTH){
+        //update the BANDWIDTH entry in the configuration file for the specified Spot
+        ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
+        //parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        confUpdated = parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        if(!confUpdated){
+            LOG(this->log_receive_channel, LEVEL_ERROR,
+                "Error during XML configuration file update in BlockDvbTal");
+            return false;
+        }
+    } else if(conf_update_request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH){
+        //update the BANDWIDTH entry in the configuration file for the specified Spot
+        ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
+        confUpdated = parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        //parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        if(!confUpdated){
+            LOG(this->log_receive_channel, LEVEL_ERROR,
+                "Error during XML configuration file update in BlockDvbTal");
+            return false;
+        }
+    } else {
+        LOG(this->log_receive_channel, LEVEL_ERROR,
+            "unknown ConfUpdate request type in BlockDvbTal");
+        return false;
+    }
+
+    //Reload the configuration file
+    {
+        vector <string> conf_files;
+        string topology_file = CONF_PATH + string(CONF_TOPOLOGY);
+        string global_file = CONF_PATH + string(CONF_GLOBAL_FILE);
+        string default_file = CONF_PATH + string(CONF_DEFAULT_FILE);
+        string plugin_conf_path = CONF_PATH + string("plugins/");
+
+        conf_files.push_back(topology_file.c_str());
+        conf_files.push_back(global_file.c_str());
+        conf_files.push_back(default_file.c_str());
+
+        //Unload configuration files content //TODO Dangerous if not reloaded properly !!!
+        Conf::unloadConfig();
+        // Load configuration files content
+        if (!Conf::loadConfig(conf_files)) {
+            LOG(this->log_init, LEVEL_CRITICAL,
+                "BlockDvbTal : cannot reload configuration files\n");
+            return false;
+        } else {
+            LOG(this->log_init, LEVEL_WARNING,
+                "BlockDvbTal : configuration file reloaded with success\n");
+        }
+        OpenSandConf::loadConfig();
+
+        // load the plugins
+        if(!Plugin::loadPlugins(true, plugin_conf_path))
+        {
+            LOG(this->log_init, LEVEL_CRITICAL,
+                    "BlockDvbTal : cannot load the plugins\n");
+            return false;
+        }
+    }
+
+
+
+    //Finally, recompute the bandwidth allocation
+    if(!this->is_scpc)
+    {
+        if(!this->initDama())
+        {
+            LOG(this->log_init, LEVEL_ERROR,
+                "failed to complete the DAMA part of the initialisation\n");
+            return false;
+        }
+
+        if(!this->initSlottedAloha())
+        {
+            LOG(this->log_init, LEVEL_ERROR,
+                "failed to complete the initialisation of Slotted Aloha\n");
+            return false;
+        }
+    }
+    else
+    {
+        if(!this->initScpc())
+        {
+            LOG(this->log_init, LEVEL_ERROR,
+                "failed to complete the SCPC part of the initialisation\n");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /*****************************************************************************/

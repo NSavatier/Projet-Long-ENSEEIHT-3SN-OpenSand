@@ -40,6 +40,7 @@
 #include "DvbChannel.h"
 #include "PhysicStd.h"  
 #include "NetBurst.h"
+#include "InSimulationConfUpdateInterface.h"
 
 #define SIMU_BUFF_LEN 255
 
@@ -60,6 +61,12 @@ class SpotUpward: public DvbChannel, public DvbFmt
 		 */ 
 		virtual bool onInit();
 
+		/**
+		 * @brief ConfUpdate bandwidth update & reallocation
+		 *
+		 * @return true on success, false otherwise
+		 */
+		virtual bool confUpdateBandwidth();
 
 		/**
 		 * @brief Handle a DVB frame
@@ -115,6 +122,14 @@ class SpotUpward: public DvbChannel, public DvbFmt
 		 * @return true on success, false otherwise
 		 */
 		bool handleSac(const DvbFrame *dvb_frame);
+
+        /**
+         * @briel apply ConfUpdate command
+         * @param conf_update_request the ConfUpdate request
+         * @return true on success, false otherwise
+         */
+        bool applyConfUpdateCommand(ConfUpdateRequest *conf_update_request);
+
 
 		/**
 		 * @brief  Getter to spot_id

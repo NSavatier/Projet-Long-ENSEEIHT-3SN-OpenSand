@@ -60,6 +60,8 @@
 // output
 #include <opensand_output/Output.h>
 
+#include "InSimulationConfUpdateInterface.h"
+
 #include <linux/param.h>
 #include <set>
 
@@ -237,6 +239,13 @@ class BlockDvbSat: public BlockDvb
 		 * Update the statistics on the satellite
 		 */
 		void updateStats(void);
+
+        /**
+         * @briel apply ConfUpdate command
+         * @param conf_update_request the ConfUpdate request
+         * @return true on success, false otherwise
+         */
+		bool applyConfUpdateCommand(ConfUpdateRequest *conf_update_request);
 				
 		/// the counter for downlink frames
 		time_sf_t down_frame_counter;
@@ -254,6 +263,9 @@ class BlockDvbSat: public BlockDvb
 		// TODO remove FMT groups from attributes
 		/// FMT groups
 		fmt_groups_t fmt_groups;
+
+        /// The interface between SAT and ConfUpdate
+        InSimulationConfUpdateInterface conf_update_interface;
 
 		/// The satellite spots
 		sat_gws_t gws;

@@ -67,6 +67,7 @@
 
 #include "NccPepInterface.h"
 #include "NccSvnoInterface.h"
+#include "InSimulationConfUpdateInterface.h"
 
 #include "SpotUpward.h"
 #include "SpotDownward.h"
@@ -215,6 +216,15 @@ class BlockDvbNcc: public BlockDvb
 		bool onEvent(const RtEvent *const event);
 
 	 protected:
+
+        /**
+         * Transmist a ConfUpdateRequest to the opposite channel
+         *
+         * @param frame The ConfUpdateRequest
+         * @return true on success, false otherwise
+         */
+        bool shareRequest(ConfUpdateRequest *request);
+
 		/**
 		 * Read configuration for the downward timers
 		 *
@@ -258,6 +268,9 @@ class BlockDvbNcc: public BlockDvb
 		
 		/// The interface between Ncc and SVNO
 		NccSvnoInterface svno_interface;
+
+        /// The interface between Ncc and ConfUpdate
+		InSimulationConfUpdateInterface conf_update_interface;
 
 		/// the MAC ID of the ST (as specified in configuration)
 		tal_id_t mac_id;

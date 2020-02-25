@@ -75,6 +75,12 @@ bool Conf::loadConfig(const vector<string> conf_files)
 	}
 }
 
+void Conf::unloadConfig(){
+    //unloads the whole configuration and section map to allow them to be reloaded
+    global_config.unloadConfig();
+    section_map.clear();
+}
+
 bool Conf::getComponent(string &compo)
 {
 	return global_config.getComponent(compo);

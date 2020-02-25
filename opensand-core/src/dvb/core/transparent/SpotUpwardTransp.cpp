@@ -102,6 +102,29 @@ bool SpotUpwardTransp::onInit(void)
 	return true;
 }
 
+
+bool SpotUpwardTransp::confUpdateBandwidth(){
+
+    //call functions to reinit bandwidth
+
+    //TODO note : checkIfSCPC() might be called here but it seems that it reverts its action reated to bandwidth
+    //TODO at the end of itself (it seems to be "just a check"). So it seems safe not to call it here
+    //TODO even if it DOES call initBand()
+
+    //TODO add  a call to it if needed
+
+    // initialize the slotted Aloha part
+    if(!this->initSlottedAloha())
+    {
+        LOG(this->log_init_channel, LEVEL_ERROR,
+            "failed to complete the DAMA part of the "
+            "initialisation\n");
+        return false;
+    }
+
+    return true;
+}
+
 bool SpotUpwardTransp::initSlottedAloha(void)
 {
 	TerminalCategories<TerminalCategorySaloha> sa_categories;
