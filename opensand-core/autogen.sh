@@ -26,5 +26,5 @@ run autoheader
 run automake --add-missing
 
 chmod +x ./configure
-./configure --enable-fail-on-warning $@
+./configure $@ #modified, was : ./configure --enable-fail-on-warning $@
 

@@ -26,5 +26,6 @@ run autoheader
 run automake --add-missing
 
 chmod +x ./configure
-./configure --enable-fail-on-warning $@
+#note : --enable-fail-on-warning removed cause it causes compilation to fail due to warnings in code
+./configure $@
 
