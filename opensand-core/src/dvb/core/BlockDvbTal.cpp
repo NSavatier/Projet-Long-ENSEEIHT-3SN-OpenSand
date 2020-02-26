@@ -1702,10 +1702,10 @@ bool BlockDvbTal::Downward::onEvent(const RtEvent *const event)
                                 "confUpdate request applied successfully\n");
                         }
                     } else {
-                        LOG(this->log_receive, LEVEL_ERROR,
-                            "Received a ConfUpdate request with wrong spot id : %d, while this ST spot ID is %d",
+                        LOG(this->log_receive, LEVEL_WARNING,
+                            "Received a ConfUpdate request with wrong spot id : %d, while this ST spot ID is %d. Drop it.",
                             request->getSpotId(), this->spot_id);
-                        return false;
+                        //nothing to do
                     }
 
                     delete request;
