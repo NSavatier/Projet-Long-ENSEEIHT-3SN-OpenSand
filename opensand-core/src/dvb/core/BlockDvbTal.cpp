@@ -1690,8 +1690,8 @@ bool BlockDvbTal::Downward::onEvent(const RtEvent *const event)
                 while(request != NULL)
                 {
                     // first get the spot concerned by the request
-                    //if the request's SPOT matches this ST's Spot, apply the request, else drop it
-                    if(request->getSpotId() == this->spot_id){
+                    //if the request's SPOT matches this ST's Spot and GW id, apply the request, else drop it
+                    if(request->getSpotId() == this->spot_id && request->getGatewayId() == this->gw_id){
                         if(!this->applyConfUpdateCommand(request)) // TODO : note the call here (ajouter au futur diagramme expliquant mes modifs)
                         {
                             LOG(this->log_receive, LEVEL_ERROR,
@@ -1703,8 +1703,8 @@ bool BlockDvbTal::Downward::onEvent(const RtEvent *const event)
                         }
                     } else {
                         LOG(this->log_receive, LEVEL_WARNING,
-                            "Received a ConfUpdate request with wrong spot id : %d, while this ST spot ID is %d. Drop it.",
-                            request->getSpotId(), this->spot_id);
+                            "Received a ConfUpdate request with wrong spot/gw id : requSpotID=%d and reqGWID=%d, while this ST spot ID is %d, and its GW is %d. Drop it.",
+                            request->getSpotId(), request->getGatewayId(), this->spot_id, this->gw_id);
                         //nothing to do
                     }
 
