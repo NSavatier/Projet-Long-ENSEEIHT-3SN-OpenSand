@@ -24,38 +24,47 @@ public:
 
 	~ConfUpdateXMLParser();
 
-	/**
-	 * Modifies the bandwidth value of the forwardLink in the /etc/opensand/core_global.conf configuration file.
-	 * This function parses the XML file looking for the tag with attribute "id" = spot and "gw" = gw_id
-	 * if it finds said tag, it odifies its value to newValue, and returns true.
-	 * If the tag is not found or any error occurs, the function returns false.
-	 * @param spot id of the spot for which we want to modify the bandwidth in the configuration file
-	 * @param gw_id id of the gateway for which we want to modify the bandwidth in the configuration file
-	 * @param newValue new value of the bandwidth to be written
-	 * @return true on success, else false
-	 */
-    bool modifyForwardBandwidthInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue);
+    /**
+    * Modifies, for the Forward Link, the bandwidth and symbolRate values contained in rootTag
+    * in the /etc/opensand/core_global.conf configuration file.
+    * @param spot id of the spot for which we want to modify the bandwidth in the configuration file
+    * @param gw_id id of the gateway for which we want to modify the bandwidth in the configuration file
+    * @param newValue new value of the bandwidth to be written
+    * @return true on success, else false
+    */
+    bool modifyForwardBandwidthAndSymbolRateInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue);
 
     /**
-	 * Modifies the bandwidth value of the returnLink in the /etc/opensand/core_global.conf configuration file.
-	 * This function parses the XML file looking for the tag with attribute "id" = spot and "gw" = gw_id
-	 * if it finds said tag, it odifies its value to newValue, and returns true.
-	 * If the tag is not found or any error occurs, the function returns false.
+	 * Modifies, for the Return Link, the bandwidth and symbolRate values contained in rootTag
+     * in the /etc/opensand/core_global.conf configuration file.
 	 * @param spot id of the spot for which we want to modify the bandwidth in the configuration file
 	 * @param gw_id id of the gateway for which we want to modify the bandwidth in the configuration file
 	 * @param newValue new value of the bandwidth to be written
 	 * @return true on success, else false
 	 */
-    bool modifyReturnBandwidthInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue);
+    bool modifyReturnBandwidthAndSymbolRateInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue);
 
 private:
 
     /**
-	 * Modifies the bandwidth value contained in rootTag in the /etc/opensand/core_global.conf configuration file.
+	 * Modifies the bandwidth and symbolRate values contained in rootTag in the /etc/opensand/core_global.conf configuration file.
 	 * This function parses the XML file looking for rootTag,
-     * then parses its children, looking the tag with attribute "id" = spot and "gw" = gw_id
-	 * if it finds said tag, it odifies its value to newValue, and returns true.
+     * then parses its children, looking the "spot" tag with attributes "id" = spot and "gw" = gw_id
+	 * if it finds said tag, it looks for the "bandwidth" tag and modifies its value to newValue.
+     * Finally, the function looks for the "carriers_distribution" tag, and for each of its down_carriers children,
+     * updates the symbol_rate attribute value to :
+     *      symbol_rate_newVal = (newValueForBandwidth / oldValueForBandwidth) * old_symbol_rate_val;
+     * This way, if the bandwidth is doubled, the symbol rate will be doubled too.
+     *
+     * If all these operations succeeded, the function returns true.
 	 * If the tag is not found or any error occurs, the function returns false.
+     *
+     * Why modifying both bandwidth and symbol_rate values ?
+     * Because simply modifying bandwidth caused the carriers number for each category to be modified, while our
+     * """client"""/supervisor was interested in updating the carrier band-length,
+     * while keeping the same number of carriers.
+     * To achieve this behavior, we need to modify both bandwidth AND symbol_rate values.
+     * For more info about this choice, see DvbChannel::initBand and DvbChannel::computeBandplan functions.
      *
      * Basically, this function factorizes the code in common between the two functions above (ie 99.9% of their code).
      *
@@ -64,7 +73,7 @@ private:
 	 * @param newValue new value of the bandwidth to be written
 	 * @return true on success, else false
 	 */
-    bool modifyBandwidthInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue, string rootTag);
+    bool modifyBandwidthAndSymbolRateInGlobalConf(spot_id_t spot, tal_id_t gw_id, freq_mhz_t newValue, string rootTag);
 };
 
 

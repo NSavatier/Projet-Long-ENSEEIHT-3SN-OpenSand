@@ -2404,8 +2404,8 @@ bool BlockDvbTal::Downward::applyConfUpdateCommand(ConfUpdateRequest *conf_updat
     if(conf_update_request->getType() == CONF_UPDATE_RETURN_BANDWIDTH){
         //update the BANDWIDTH entry in the configuration file for the specified Spot
         ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
-        //parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
-        confUpdated = parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        //parser->modifyForwardBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        confUpdated = parser->modifyReturnBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
         if(!confUpdated){
             LOG(this->log_receive_channel, LEVEL_ERROR,
                 "Error during XML configuration file update in BlockDvbTal");
@@ -2414,8 +2414,8 @@ bool BlockDvbTal::Downward::applyConfUpdateCommand(ConfUpdateRequest *conf_updat
     } else if(conf_update_request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH){
         //update the BANDWIDTH entry in the configuration file for the specified Spot
         ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
-        confUpdated = parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
-        //parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        confUpdated = parser->modifyForwardBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
+        //parser->modifyReturnBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(), conf_update_request->getGatewayId(), conf_update_request->getBandwidthNewValue());
         if(!confUpdated){
             LOG(this->log_receive_channel, LEVEL_ERROR,
                 "Error during XML configuration file update in BlockDvbTal");

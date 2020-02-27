@@ -1086,7 +1086,7 @@ bool SpotDownward::applyConfUpdateCommand(ConfUpdateRequest *conf_update_request
     if(conf_update_request->getType() == CONF_UPDATE_FORWARD_BANDWIDTH){
         //update the BANDWIDTH entry in the configuration file for the specified Spot
         ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
-        confUpdated = parser->modifyForwardBandwidthInGlobalConf(conf_update_request->getSpotId(),
+        confUpdated = parser->modifyForwardBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(),
                                                                  conf_update_request->getGatewayId(),
                                                                  conf_update_request->getBandwidthNewValue());
         delete parser;
@@ -1108,7 +1108,7 @@ bool SpotDownward::applyConfUpdateCommand(ConfUpdateRequest *conf_update_request
         {
             //else, handle the request, because SpotDownwardRegen uses RETURN_UP_BAND
             ConfUpdateXMLParser *parser = new ConfUpdateXMLParser();
-            confUpdated = parser->modifyReturnBandwidthInGlobalConf(conf_update_request->getSpotId(),
+            confUpdated = parser->modifyReturnBandwidthAndSymbolRateInGlobalConf(conf_update_request->getSpotId(),
                                                                     conf_update_request->getGatewayId(),
                                                                     conf_update_request->getBandwidthNewValue());
             delete parser;
