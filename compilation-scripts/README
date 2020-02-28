@@ -1,0 +1,45 @@
+This folder contains a bunch of scripts to ease compilation of my modified version of OpenSAND
+
+
+To install opensand from the source code : 
+
+0) Make sure that you have copied the opensand.tar.gz archive (that contains the source) in this folder, 
+   as well as the "install_scripts" folder.
+   You should a deploy_locally_shared_folder.sh script.
+
+1) Run the deploy_locally_shared_folder.sh script via source.
+   It will copy all the files and put you in a temporary folder.
+   To do so : 
+
+source ./deploy_locally_shared_folder.sh
+
+2) (from the temporary install folder, ie "/tmp/opensand_installer_dir") :
+   Run the installer.
+   It will install the required libraries, compile all open-sand sources and install them.
+   To so so, simply type : 
+
+./buildAndInstallAll.sh
+
+
+The installer will call a bunch of scripts that will install all opensand modules one by one.
+If any step fails, the installer will stop and should notify you which operation failed.
+
+3) That's it. OpenSand should now be installed on your VM / Computer
+
+
+
+TROUBLESHOOTING
+
+IF Opensand-Core COMPILATION FAILS (error saying someting like <function> is not defined in Conf) : 
+=> Purge open sand from your system by running : 
+cd purgeOpenSand
+./removeAndPurgeOpenSand.sh
+
+=> Do the partial compilation of opensand (will compile and install opensand Optput, Conf, and RT
+./doPartialCompilation.sh
+
+=> Finally, do the compilation and packaging
+./buildAndInstallAll.sh
+
+
+A cleanAndRecompileAll.sh script is provided which does this whole purging opensand/compilation/copy of packages process.

@@ -1,0 +1,2 @@
+This script install dependencies required for compilation of opensand
+It should be run from the script buildAndInstallAll.sh
