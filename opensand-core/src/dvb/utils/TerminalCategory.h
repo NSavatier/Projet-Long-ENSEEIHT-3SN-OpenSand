@@ -251,7 +251,7 @@ class TerminalCategory
 			}
 			total_number += number;
 			(*it)->setCarriersNumber(number);
-			LOG(this->log_terminal_category, LEVEL_NOTICE, 
+			LOG(this->log_terminal_category, LEVEL_WARNING, //TODO : changed from NOTICE to WARNING
 			    "Carrier group %u: number of carriers %u\n",
 			    (*it)->getCarriersId(), number);
 
@@ -269,7 +269,7 @@ class TerminalCategory
 			// get the capacity of the carriers
 			capacity_sym = ceil(rs_symps * superframe_duration_ms / 1000.0);
 			(*it)->setCapacity(capacity_sym);
-			LOG(this->log_terminal_category, LEVEL_NOTICE, 
+			LOG(this->log_terminal_category, LEVEL_WARNING, //TODO : changed from NOTICE to WARNING
 			    "Carrier group %u: capacity for Symbol Rate %.2E: %u "
 			    "symbols\n", (*it)->getCarriersId(),
 			    rs_symps, capacity_sym);

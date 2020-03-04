@@ -396,7 +396,7 @@ bool DvbChannel::initBand(ConfigurationList spot,
 		goto error;
 	}
 	bandwidth_khz = bandwidth_mhz * 1000;
-	LOG(this->log_init_channel, LEVEL_INFO,
+	LOG(this->log_init_channel, LEVEL_WARNING, //TODO changed this to WARNING , remove
 	    "%s: bandwitdh is %u kHz\n",
 	    section.c_str(), bandwidth_khz);
 
@@ -895,7 +895,7 @@ bool DvbChannel::computeBandplan(freq_khz_t available_bandplan_khz,
 			    "Increase band for one carrier\n");
 			carriers_number = 1;
 		}
-		LOG(this->log_init_channel, LEVEL_NOTICE,
+		LOG(this->log_init_channel, LEVEL_WARNING,   //TODO changed this to WARNING, remove
 		    "Number of carriers for category %s: %d\n",
 		    category->getLabel().c_str(), carriers_number);
 

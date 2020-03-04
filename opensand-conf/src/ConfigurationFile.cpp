@@ -86,6 +86,7 @@ ConfigurationFile::~ConfigurationFile()
 
 bool ConfigurationFile::loadConfig(const string conf_file)
 {
+    std::cout << "ConfigurationFile.cpp :Conf File Loaded : " << conf_file << std::endl;//TODO : Logging, remove me
 	vector<string> file(1, conf_file);
 	return this->loadConfig(file);
 }
@@ -128,6 +129,7 @@ bool ConfigurationFile::loadConfig(const vector<string> conf_files)
 		{
 			new_parser = new xmlpp::DomParser();
 			new_parser->set_substitute_entities();
+            std::cout << "ConfigurationFile.cpp :Conf File Loaded : " << (*it) << std::endl;//TODO : Logging, remove me
 			new_parser->parse_file((*it));
 			root = new_parser->get_document()->get_root_node();
 			if(root->get_name() != "configuration")
@@ -251,6 +253,7 @@ void ConfigurationFile::loadSectionMap(map<string, ConfigurationList> &section_m
 			{
 				this->getSection(name.c_str(), sectionList);
 				section_map[name] = sectionList;
+                std::cout << "ConfigurationFile.cpp : Entry loaded in section map : " << name << std::endl; // TODO Logging, remove me
 			}
 		}
 	}
