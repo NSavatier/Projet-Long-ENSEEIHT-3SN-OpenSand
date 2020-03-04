@@ -2,6 +2,8 @@
 
 # ALTERNATIVE COMPILATION SCRIPT
 
+startFolder=$(pwd)
+
 #=> Purge open sand from your system by running : 
 cd purgeOpenSand
 ./removeAndPurgeOpenSand.sh
@@ -10,7 +12,7 @@ cd ..
 #=> Do the partial compilation of opensand (will compile and install opensand Optput, Conf, and RT
 source ./doPartialCompilation.sh
 returnVal=$?
-cd /share
+cd $startFolder
 
 #=> Finally, do the compilation and packaging
 if [ "$returnVal" -eq "0" ]; then

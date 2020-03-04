@@ -2,7 +2,7 @@
 
 #installs ALL OpenSAND packages
 
-folder=/share/opensand-compiled-packages
+folder=./opensand-compiled-packages
 
 #install requirements
 sudo apt-add-repository "deb http://packages.net4sat.org/opensand xenial stable"
@@ -65,10 +65,6 @@ sudo apt install -y --allow-unauthenticated $folder/libopensand-rohc-lan-adapt-p
 sudo apt install -y --allow-unauthenticated $folder/libopensand-rohc-lan-adapt-plugin-conf_5.1.2_amd64.deb
 sudo apt install -y --allow-unauthenticated $folder/libopensand-rohc-lan-adapt-plugin-dbg_5.1.2_amd64.deb
 sudo apt install -y --allow-unauthenticated $folder/libopensand-rohc-lan-adapt-plugin-manager_5.1.2_amd64.deb
-
-#installs all packages required by an OpenSAND entity (ST, GW or SAT) with required plugins
-#TODO useless ?
-#sudo apt install $folder/opensand_5.1.2_amd64.deb
 
 
 

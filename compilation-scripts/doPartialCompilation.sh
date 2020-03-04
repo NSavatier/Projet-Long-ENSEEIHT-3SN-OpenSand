@@ -3,14 +3,6 @@
 #this script copies this whole shared folder into /tmp/opensand_installer_dir
 #and then cds to it
 
-# check that script was executed with source
-if [ $_ == $0 ]; then 
-    echo "This script must be lauched with source (for end of script cd)."
-    echo "Please lauch it via : "
-    echo "source ./doPartialCompilation.sh" 
-    exit 1
-fi
-
 startingDir=$(pwd)
 
 installDIR="/tmp/opensand_installer_dir"
@@ -35,4 +27,4 @@ sudo ./install_scripts/buildAndInstallAll.sh
 cd $startingDir
 
 echo "done !"
-return
+#return

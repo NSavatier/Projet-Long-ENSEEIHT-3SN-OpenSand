@@ -9,7 +9,7 @@
 
 currentDIR=$(pwd)
 
-cd ../../opensand/opensand-plugins/encapsulation/rle
+cd ../../opensand-plugins/encapsulation/rle
 returnVal=$?
 
 #execute make and exit if it fails

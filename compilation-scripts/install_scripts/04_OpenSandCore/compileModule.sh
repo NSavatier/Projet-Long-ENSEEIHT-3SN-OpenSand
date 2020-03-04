@@ -1,5 +1,5 @@
 #/bin/bash
-cd ../../opensand/opensand-core
+cd ../../opensand-core
 sudo ./autogen.sh
 returnVal=$?
 

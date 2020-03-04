@@ -1,5 +1,5 @@
 #/bin/bash
-cd ../../opensand/opensand-plugins/encapsulation/rle
+cd ../../opensand-plugins/encapsulation/rle
 sudo ./autogen.sh
 returnVal=$?
 

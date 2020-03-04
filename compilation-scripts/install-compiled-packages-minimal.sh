@@ -2,7 +2,7 @@
 
 #installs packages required for a ST/SAT/GW
 
-folder=/share/opensand-compiled-packages
+folder=./opensand-compiled-packages
 
 #install requirements
 sudo apt-add-repository "deb http://packages.net4sat.org/opensand xenial stable"

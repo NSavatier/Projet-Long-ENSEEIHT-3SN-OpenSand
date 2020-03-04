@@ -1,3 +1,4 @@
+
 ## Brief Repository Description
 This repository is a Fork of Opensand 5.1.2 , made for a student project at ENSEEIHT.
 
@@ -41,14 +42,74 @@ You can install them directly using you preferred packet manager (such as apt).
 ### Summary
 My custom-made compilation scripts are available on the repository, inside the folder "compilation-scripts".
 
+
 They are decomposed various bash scripts which allow for a somewhat pain-free compilation of openSAND.
+
 
 I used these scripts during this project development to ease compilation and deployment, so they should do the job for you.
 
+
 *(detailed description and re-testing of scripts to be done and redacted here)*
+
+
+### Package the source files
+First of all, you'll need to package the sources into an archive.
+
+
+A script in provided to do so easily. 
+Go into the "compilation-scripts" folder, and run it : 
+
+    cd compilation-scripts
+    ./packageSources.sh
+
+
+### Compile my modified version of OpenSAND using the packages archive
+Then, you'll need to compile my modified version of OpenSAND on your system.
+
+
+To do so, I'm providing the script "cleanAndRecompileAll". 
+This script does the following operations : 
+
+
+ - It **uninstalls all versions of OpenSAND present on your system** (as some OpenSAND packages need to be compiled and installed before the  rest of the compilation can be done, and having other versions of OpenSAND may create issues during the compilation)  
+   
+  - Then, it **installs the packages required to compile** OpenSAND.
+ - It copies opensand sources to **/tmp/opensand_installer_dir** (to avoid read/write rights issues).
+ - Then it **compiles OpenSAND** from this folder.
+ - Finally, it copies the **built packages** it to a new folder ***./opensand-compiled-packages***.
+
+
+To run it, simply type : 
+
+    ./cleanAndRecompileAll.sh
+  
+  
+  If any error occurs, you should check the logs in your terminal, to see where the issue comes from.
+  
+  
+  If you want to check the compilation logs, you can find them in  : 
+  **/tmp/workspace/src/<module_name>/build.log** (for build errors) 
+  and **/tmp/workspace/src/<module_name>/config.log** (for configuration errors)
+
+
+The whole compilation process can take several minutes (around 10 in my computer), so be patient.
+
+
+If everything went fine, you should have a final output that looks like : 
+
+![build success image](/docImages/buildSuccess.png)
+*Every OpenSand package was built successfully.*
+
+
+You should now have the OpenSAND compiled packages in the folder "opensand-compiled-packages".
+
+
+  ![The built packages](/docImages/packages.png)
+*Every OpenSand package was built successfully.*
 
 ## Work Technical Description
 
 *(description to be extended in the near future)*
+
 
 

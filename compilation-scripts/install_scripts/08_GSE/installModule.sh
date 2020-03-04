@@ -9,7 +9,7 @@
 
 currentDIR=$(pwd)
 
-cd ../../opensand/opensand-plugins/encapsulation/gse
+cd ../../opensand-plugins/encapsulation/gse
 returnVal=$?
 
 #execute make and exit if it fails

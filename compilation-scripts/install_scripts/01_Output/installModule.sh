@@ -9,7 +9,7 @@
 
 currentDIR=$(pwd)
 
-cd ../../opensand/opensand-output
+cd ../../opensand-output
 returnVal=$?
 
 #execute make and exit if it fails

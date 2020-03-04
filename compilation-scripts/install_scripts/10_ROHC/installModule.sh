@@ -9,7 +9,7 @@
 
 currentDIR=$(pwd)
 
-cd ../../opensand/opensand-plugins/lan_adaptation/rohc
+cd ../../opensand-plugins/lan_adaptation/rohc
 returnVal=$?
 
 #execute make and exit if it fails

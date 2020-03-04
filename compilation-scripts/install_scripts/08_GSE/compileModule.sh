@@ -1,5 +1,5 @@
 #/bin/bash
-cd ../../opensand/opensand-plugins/encapsulation/gse
+cd ../../opensand-plugins/encapsulation/gse
 sudo ./autogen.sh
 returnVal=$?
 

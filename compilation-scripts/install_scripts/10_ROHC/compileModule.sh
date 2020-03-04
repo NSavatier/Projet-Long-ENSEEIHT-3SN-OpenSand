@@ -1,5 +1,5 @@
 #/bin/bash
-cd ../../opensand/opensand-plugins/lan_adaptation/rohc
+cd ../../opensand-plugins/lan_adaptation/rohc
 sudo ./autogen.sh
 returnVal=$?
 
