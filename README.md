@@ -31,12 +31,10 @@ This repository contains the complete sources of OpenSAND, imported from OpenSAN
 
 To use it, simply download the whole repository, or clone it.
 
-Then, you'll need to compile the sources, a method can be found on the [OpenSAND wiki,](https://wiki.net4sat.org/doku.php?id=opensand:manuals:compilation_manual:index) but you can also use my scripts to do so (I recommend to use them for simplicity's sake).
+Then, you'll need to compile the sources, a method can be found on the [OpenSAND wiki,](https://wiki.net4sat.org/doku.php?id=opensand:manuals:compilation_manual:index) but you can also use my scripts to do so (I recommend to use them for simplicity's sake). See below for how to use my compilation scripts.
 
 Once you have compiled the sources, you should have various .deb packages.
 You can install them directly using you preferred packet manager (such as apt).
-
-*(note to myself : incude said scripts in the repo )*
 
 ##  Compilation using my scripts
 ### Summary
