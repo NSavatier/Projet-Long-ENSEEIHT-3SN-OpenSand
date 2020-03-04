@@ -105,11 +105,16 @@ You should now have the OpenSAND compiled packages in the folder "opensand-compi
 
 
   ![The built packages](/docImages/packages.png)
-*Every OpenSand package was built successfully.*
+*The resulting compiled packages.*
+
+
+Those packages can then be used to install OpenSAND on any system.
+
+If you want an easy way to test and deploy OpenSAND on Docker Containers, I recommand the work of my colleague Martin Frisch (to which I contributed), [OpenSAND-Docker](https://github.com/neuaa/opensand-docker).
 
 ## Work Technical Description
 
 *(description to be extended in the near future)*
 
-
+In the meantime, you can have a look [on a report I did on the subject](https://docs.google.com/document/d/1ub_hdDlMNW_xi6T9Ws51WGOzviqY1qHeX4DEuUJeD-E/edit?usp=sharing).
 
