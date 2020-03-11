@@ -1,5 +1,6 @@
 
 
+
 ## Brief Repository Description
 This repository is a Fork of Opensand 5.1.2 , made for a student project at ENSEEIHT.
 
@@ -131,7 +132,7 @@ These messages allow a user to request for a bandwidth update, during a simulati
 
 The format for those messages is the following :
 
-![](https://lh3.googleusercontent.com/OJBXI_Ol_ZVpzV-0Xw94RCFMTDSZgnOKZQvfmrF7CR4NeNP9dXmC9Lk9_ynAXtSGlBEoQlSOIvE2c9sa1lSYO2a0bmZo02LQy_lLs4DnGkzyWt8BvF5RIfzShp2IydD352CciF3d)
+![](docImages/requestFormat.png)
 
 As you can see in the image above, requests are composed of 4 fields, separated by ":", that indicate the needed information for a bandwidth update :
 
@@ -154,7 +155,8 @@ In order to ease this "message-sending", we wrote a shell script that sends thos
 
 The general principle of this script can be seen in the image below.
 
-![](https://lh6.googleusercontent.com/bDPJCqtjhyUM2CI30Ye3MOd1oJxIIOMuCJ0WNTGUcs33TsnplLbSC4PGS1GlwatNiHBtpqP_j364TOw3tONOruLPv_BKqyl5nagptdp7b_ZCHEcQ3IPK26BO51dr6bYoi93igaXY)
+![](docImages/exampleMessage.png)
+
 *An example of usage of the modify_bandwidth.sh script*
 
   
@@ -172,9 +174,11 @@ When a bandwidth update is received by a system (ST, GW, SAT), it is analysed, i
 
   
 
-This behavior is illustrated with the example below.![](https://lh4.googleusercontent.com/PPuYOzvWU67qdJf9MwWXUK9hl3P3b2QvJkhoBRrfEuPwEIK2uVBsPVA-SFU1KWlQPddHrQfWNGU-DSLXvf6k3mpeeRk8XdLJjn0tU-ZMUyWRBmR8IPF8mAOIP782nfnDRcK0eNIE)
+This behavior is illustrated with the example below.
 
-An example of how the requests are handled by the different systems.
+![](docImages/exampleRequest.png)
+
+*An example of how the requests are handled by the different systems.*
 
   
 
@@ -196,9 +200,9 @@ The system then continues to work as usual afterwards.
 
 As said in the "high-level view" of our implementation, two main operations must be performed when a bandwidth update request is received by a system :
 
--   Update the configuration file with the new value for the bandwidth
+-   **Update the configuration file** with the new value for the bandwidth
     
--   Reset part of the system so that the new value can be used for the current simulation, without interrupting it.
+-   **Reset part of the system** so that the new value can be used for the current simulation, without interrupting it.
     
 
   
@@ -217,19 +221,18 @@ The bandwidth parameter is described in the core_global.conf file, located in /e
 
 More precisely, the lines that describe the forward bandwidth are the following :
 
-(Screenshot)
+![](docImages/confForwardBand.png)
 
   
 
 And the ones describing the Return bandwidth are :
 
-(Screenshot)
-
+![](docImages/confReturnBand.png)
   
 
-Knowing that, we wrote C++ functions to update these two parts of the configuration file.
+Knowing that, we wrote C++ functions (*modifyForwardBandwidthAndSymbolRateInGlobalConf* and *modifyReturnBandwidthAndSymbolRateInGlobalConf*) to update these two parts of the configuration file.
 
-These functions are implemented in the TODO_INSERT_EXACT_CLASSNAME_HERE file, located in the TODO_FOLDER_NAME folder.
+These functions are implemented in the *ConfUpdateXMLParser.cpp* file, located in the *opensand-core/src/conf* folder.
 
   
 
@@ -239,8 +242,10 @@ These two functions parse the XML configuration file to look for the field conta
 
 The symbol rate associated with this bandwidth is also updated, using the formula :
 
-TODO_FORMULA_HERE
+    double symbol_rate_new_val = (newValue / oldValueForBandwidth) * old_symbol_rate_val;
+with **newValue** beeing the new value for the bandwidth contained in the request.
 
+That way, if the bandwidth is doubled, the symbol rate is doubled and so on.
   
 
 #### Why updating the symbol rate ?
@@ -265,7 +270,7 @@ This modifies various configuration files of the machine that runs the manager.
 
 When you start the simulation, these configuration files are then deployed on each of the "Daemon Machines" (see image below).
 
-![](https://lh5.googleusercontent.com/sa9rRo2I6spqjtmEpC2s-qurjffbkH5wQzdNv3zkXhdCmsDEpoe1tt21ZOIvujkyJHROt-zoacCm-b6T8ZRl5NRj08eZLtGppHU7zk2OUv9U2USQVcjtIZUW4oNf6s8YJpxzVjUP)
+![](docImages/confFilesDeployment.png)
 
 The OpenSAND Daemons then starts each of the systems processes (STs, GWs, SAT…) by launching their executable.
 
@@ -296,21 +301,51 @@ Our analysis determined that the bandwidth was used in the Dvb Block of all syst
 We thus chose to reset only those parts of OpenSAND systems, in order to minimize the impact of our modifications to the general behavior of OpenSAND.
 
 
-We will now detail how we chose to implement the "reset" in each system.
+To do so, we defined, for each DvbBlock (the GW's, the SAT's and the ST's), a function dedicated to handling bandwidth update requests.
+
+These functions update the XML configuration file (as described in the previous part of this documentation), reload it, then do the "partial reset".
+
+Due to the way OpenSAND is implemented (and the limited time we had, which excluded doing major modifications on openSAND's code), we had to resort to quite dirty tricks to do the job : 
+
+ **First, these functions update the XML configuration file by calling the  functions from`ConfUpdateXMLParser`** 
+
+**Then, these functions unload the whole configuration (!), then it is entirely reloaded.** 
+
+**Why doing that ?** 
+Because, as far as we understood, when OpenSAND loads a configuration file, it saves its `DomParser` in a `vector<xmlpp::DomParser *>` (for more info, see in ConfigurationFile.cpp, the function `ConfigurationFile::loadConfig(const vector<string> conf_files)`).
+The issue with this particular data structure, is that we have no way to find out what entry corresponds to the configuration file we want to update (with a Map for example, it would have been possible, but a vector is basically a list).
+Moreover, DomParser objects do not give the possibility to get the path of the file with which they were instanciated... so we cannot simply get each element of the vector and get its "file path" to see if it matches the file we want to update.
+Because of this, we had to resolve to the dirty "unload-reload the whole configuration to update it" trick.
+Far from ideal, indeed.
+
+
+**Finally, some operations, dependent on the component/system are performed.**
+
+The general idea of these operations is to reset/recompute some fields whose value depends on the bandwidth, without breaking the whole component. 
+
+
+
+### Where to look at if you want to have a look at our implementation ?
 
 #### Partial Reset of the Gateways (GW)
 
-  To be detailed
+In the gateway, the handling of Bandwidth update request is implemented, in two places : 
+
+For the upward way (Return band), in the SpotUpward class, in the *applyConfUpdateCommand()* function.
+
+For the downward way (Forward band), in the SpotDownward class, in the *applyConfUpdateCommand()* function.
   
 
 #### Partial Reset of the satellite (SAT)
 
-To be detailed
+For the SAT, the handling of Bandwidth update request is implemented, in the BlockDvbSat.cpp, in the function applyConfUpdateCommand().
+
   
 
 #### Partial Reset of the Satellite Terminals (ST)
 
-To be detailed
+
+For the ST, the handling of Bandwidth update request is implemented, in the BlockDvbTal.cpp, in the function applyConfUpdateCommand().
   
   
   
@@ -337,7 +372,7 @@ Some warning messages are logged in the OpenSAND manager when a simulation is lo
 
 This is normal, and was done for testing and demonstration purposes.
 
-If this behavior is an issue for you, you can revert it by reverting the commit TODO_COMMIT_NUMBER which added this logging behavior.
+If this behavior is an issue for you, you can revert it by reverting the commit [8b4d9bbd7e4c494562b3701e73ac212b755c9c94](https://github.com/NSavatier/Projet-Long-ENSEEIHT-3SN-OpenSand/commit/8b4d9bbd7e4c494562b3701e73ac212b755c9c94) which added this logging behavior.
 
   
 
@@ -354,14 +389,4 @@ This issue is due to the fact that we reset parts of the Dvb block when a Bandwi
 
 This reset re-instantiates some probes which are then re-registered by the OpenSAND manager.
 
-  
-  
-
-### Updating the bandwidth with multiple Gatways causes TODO messages to be rejected
-
-  
-
-This issue is due to the fact that (detail here)
-
-A solution for this issue would be to (detail solution here)
 
